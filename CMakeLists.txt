@@ -22,6 +22,7 @@ include_directories(${PNG_INCLUDE_DIRS})
 
 add_subdirectory(src)
 add_subdirectory(tools)
+add_subdirectory(doc)
 
 set(CPACK_PACKAGE_VERSION_MAJOR ${FLIF_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${FLIF_VERSION_MINOR})
