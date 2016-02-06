@@ -1,67 +1,76 @@
-cmake_minimum_required(VERSION 2.8.12)
-project(flif)
+#
+# List of sources/headers
+# NB: This is currently an exact copy of the variables specified in Makefile but
+#     could probably be improved.
+file(GLOB files_H maniac/*.hpp maniac/*.cpp image/*.hpp transform/*.hpp flif-enc.hpp flif-dec.hpp
+	    	  common.hpp flif_config.h filio.hpp io.hpp io.cpp config.h compile-specific.hpp)
+file(GLOB files_C maniac/chance.cpp maniac/symbol.cpp image/crc32k.cpp image/image.cpp image/image-png.cpp
+	  	  image/image-pnm.cpp image/image-pam.cpp image/image-rggb.cpp image/color_range.cpp
+		  transform/factory.cpp common.cpp flif-enc.cpp flif-dec.cpp io.cpp)
 
-option(FLIF_SHARED "Build shared lib" OFF)
+#
+# flifenc: command-line encoder/decoder
+option(FLIF_WITH_flifenc "Build command-line encoder/decoder" ON)
+if(FLIF_WITH_flifenc)
+    add_executable(flifenc flif.cpp ${files_H} ${files_C})
+    set_target_properties(flifenc PROPERTIES OUTPUT_NAME flif CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+    target_link_libraries(flifenc ${PNG_LIBRARIES})
+    install(TARGETS flifenc RUNTIME DESTINATION bin)
+endif(FLIF_WITH_flifenc)
 
-find_package(PNG REQUIRED)
+#
+# libflif_dec: decoder-only library
+option(FLIF_WITH_libflif_dec "Build decoder-only library" ON)
+if(FLIF_WITH_libflif_dec)
+    add_library(flif_dec ${FLIF_LIB_TYPE} ${files_H} ${files_C} library/flif_dec.h library/flif-interface-private_dec.hpp
+                                          library/flif-interface_dec.cpp)
+    set_target_properties(flif_dec PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+    if(WIN32 AND FLIF_BUILD_SHARED_LIBS)
+        target_compile_definitions(flif_dec PRIVATE -DFLIF_BUILD_DLL)
+    endif(WIN32 AND FLIF_BUILD_SHARED_LIBS)
+    install(TARGETS flif_dec RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+endif(FLIF_WITH_libflif_dec)
 
-set(IMAGE_SOURCES
-    image/color_range.cpp
-    image/crc32k.cpp
-    image/image-pam.cpp
-    image/image-png.cpp
-    image/image-pnm.cpp
-    image/image-rggb.cpp
-    image/image.cpp
-)
+#
+# libflif_enc: encoder-only library
+option(FLIF_WITH_libflif_enc "Build encoder-only library" ON)
+if(FLIF_WITH_libflif_enc)
+    add_library(flif_enc ${FLIF_LIB_TYPE} ${files_H} ${files_C} library/flif_enc.h library/flif-interface-private_enc.hpp
+                                          library/flif-interface_enc.cpp)
+    set_target_properties(flif_enc PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+    if(WIN32 AND FLIF_BUILD_SHARED_LIBS)
+        target_compile_definitions(flif_enc PRIVATE -DFLIF_BUILD_DLL)
+    endif(WIN32 AND FLIF_BUILD_SHARED_LIBS)
+    install(TARGETS flif_enc RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+endif(FLIF_WITH_libflif_enc)
 
-set(MANIAC_SOURCES
-    maniac/chance.cpp
-    maniac/symbol.cpp
-)
+#
+# libflif: combined encoder/decoder library
+option(FLIF_WITH_libflif "Build combined encoder/decoder library" ON)
+if(FLIF_WITH_libflif)
+    add_library(flif ${FLIF_LIB_TYPE} ${files_H} ${files_C}
+                                      library/flif_dec.h library/flif-interface-private_dec.hpp library/flif-interface_dec.cpp
+                                      library/flif_enc.h library/flif-interface-private_enc.hpp library/flif-interface_enc.cpp)
+    set_target_properties(flif PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+    if(WIN32 AND FLIF_BUILD_SHARED_LIBS)
+        target_compile_definitions(flif PRIVATE -DFLIF_BUILD_DLL)
+    endif(WIN32 AND FLIF_BUILD_SHARED_LIBS)
+    install(TARGETS flif RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+endif(FLIF_WITH_libflif)
 
-set(TRANSFORM_SOURCES
-    transform/factory.cpp
-)
+#
+# viewflif: SDL2-based FLIF viewer
+option(FLIF_WITH_viewflif "Build viewflif viewer (requires libflif_dec)" ON)
+if(FLIF_WITH_viewflif AND FLIF_WITH_libflif_dec)
+    find_package(SDL2 REQUIRED)
+    add_executable(viewflif viewflif.c)
+    target_include_directories(viewflif PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/library PRIVATE ${SDL2_INCLUDE_DIRS})
+    string(STRIP ${SDL2_LIBRARIES} FLIF_SDL2_LIBRARIES)
+    target_link_libraries(viewflif flif_dec ${PNG_LIBRARIES} ${FLIF_SDL2_LIBRARIES})
+    install(TARGETS viewflif RUNTIME DESTINATION bin)
+endif(FLIF_WITH_viewflif AND FLIF_WITH_libflif_dec)
 
-if(FLIF_SHARED)
-    set(INTERFACE_SOURCES
-        library/flif-interface.cpp
-    )
-else()
-    set(EXE_SOURCES
-        flif.cpp
-    )
-endif()
-
-# Use cmake -DCMAKE_CXX_FLAGS=-pg to support other build types.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-ggdb3")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-
-if(USE_ASAN)
-    message(STATUS "Using ASAN")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-endif()
-
-set(PROJECT_SOURCES
-    ${IMAGE_SOURCES}
-    ${MANIAC_SOURCES}
-    ${TRANSFORM_SOURCES}
-    ${INTERFACE_SOURCES}
-    io.cpp
-    common.cpp
-    flif-dec.cpp
-    flif-enc.cpp
-    ${EXE_SOURCES}
-)
-
-if(FLIF_SHARED)
-    add_library(${PROJECT_NAME} SHARED ${PROJECT_SOURCES})
-else()
-    add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
-endif()
-
-target_link_libraries(${PROJECT_NAME}
-    ${PNG_LIBRARY}
-)
+#
+# Install target for headers
+file(GLOB libflif_INSTALL_HEADERS library/*.h)
+install(FILES ${libflif_INSTALL_HEADERS} DESTINATION include)
