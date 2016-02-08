@@ -55,8 +55,9 @@ endif(FLIF_WITH_libflif_enc)
 option(FLIF_WITH_libflif "Build combined encoder/decoder library" ON)
 if(FLIF_WITH_libflif)
     add_library(flif ${FLIF_LIB_TYPE} ${files_H} ${files_C}
-                                      library/flif_dec.h library/flif-interface-private_dec.hpp library/flif-interface_dec.cpp
-                                      library/flif_enc.h library/flif-interface-private_enc.hpp library/flif-interface_enc.cpp
+                                      library/flif_dec.h library/flif-interface-private_dec.hpp
+                                      library/flif_enc.h library/flif-interface-private_enc.hpp
+                                      library/flif-interface.cpp
                                       library/flif_common.h)
     set_target_properties(flif PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
     if(FLIF_BUILD_SHARED_LIBS)
